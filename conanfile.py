@@ -8,7 +8,7 @@ import os
 
 class openblasConan(ConanFile):
     name = "openblas"
-    version = "0.2.20"
+    version = "0.3.1"
     url = "https://github.com/xianyi/OpenBLAS"
     homepage = "http://www.openblas.net/"
     description = "OpenBLAS is an optimized BLAS library based on GotoBLAS2 1.13 BSD version."
@@ -46,14 +46,21 @@ class openblasConan(ConanFile):
 
     def build(self):
         if self.settings.compiler != "Visual Studio":
-            make_options = "DEBUG={0} NO_SHARED={1} BINARY={2} NO_LAPACKE={3} USE_MASS={4} USE_OPENMP={5}".format(
+            make_options = "DEBUG={0} BINARY={1}".format(
                 self.get_make_build_type_debug(),
-                self.get_make_option_value(not self.options.shared),
                 self.get_make_arch(),
-                self.get_make_option_value(self.options.NO_LAPACKE),
-                self.get_make_option_value(self.options.USE_MASS),
-                self.get_make_option_value(self.options.USE_OPENMP))
+            )
+            if not self.options.shared:      make_options += ' NO_SHARED=1'
+            if not self.options.NO_LAPACKE:  make_options += ' NO_LAPACKE=1'
+            if not self.options.USE_MASS:    make_options += ' USE_MASS=1'
+            if not self.options.USE_OPENMP:  make_options += ' USE_OPENMP=1'
+
+            self.output.info('Running make with: %s'%make_options)
             self.run("cd sources && make %s" % make_options, cwd=self.source_folder)
+
+            self.output.info('Calling make install')
+            self.run('cd sources && make PREFIX=%s install'%self.package_folder)
+
         else:
             self.output.warn("Building with CMake: Some options won't make any effect")
             cmake = CMake(self)
@@ -64,24 +71,36 @@ class openblasConan(ConanFile):
             cmake.build()
 
     def package(self):
-        with tools.chdir("sources"):
-            self.copy(pattern="LICENSE", dst="licenses", src="sources",
-                      ignore_case=True, keep_path=False)
-
-            if self.settings.compiler == "Visual Studio":
-                self.copy(pattern="*.h", dst="include", src=".")
-            else:
-                self.copy(pattern="*.h", dst="include", src="sources")
-
-            self.copy(pattern="*.dll", dst="bin", src="lib", keep_path=False)
-            self.copy(pattern="*.so*", dst="lib", src="lib", keep_path=False)
-            self.copy(pattern="*.dylib", dst="lib", src="lib", keep_path=False)
-            self.copy(pattern="*.lib", dst="lib", src="lib", keep_path=False)
-            self.copy(pattern="*.a", dst="lib", src=".", keep_path=False)
-            self.copy(pattern="*.a", dst="lib", src="lib", keep_path=False)
+        self.fixPkgConfig(os.path.join(self.package_folder, 'lib', 'pkgconfig', 'openblas.pc'))
+        self.fixCMakeConfig(os.path.join(self.package_folder, 'lib', 'cmake', 'openblas', 'OpenBLASConfig.cmake'))
 
     def package_info(self):
         self.cpp_info.libs = tools.collect_libs(self)
 
         if self.settings.os == "Linux":
             self.cpp_info.libs.append("pthread")
+
+    def fixPkgConfig(self, openblas):
+        # pkg config files don't seem to be generated on windows by default.
+        if self.settings.os == "Linux":
+            self.output.info('Modifying pkg-config file to start with a prefix')
+            with open(openblas) as f: data = f.read()
+            data = 'prefix=%s\n'%self.package_folder + data
+            with open(openblas, 'w') as f: f.write(data)
+
+            self.output.info('Modifying pkg-config file to use a variable prefix')
+            tools.replace_in_file(
+                file_path=openblas,
+                search=self.package_folder,
+                replace="${prefix}"
+            )
+
+    def fixCMakeConfig(self, cmake_config_file):
+        self.output.info('Modifying %s a prefix'%cmake_config_file)
+        tools.replace_in_file(
+            file_path=cmake_config_file,
+            search=self.package_folder,
+            replace="${CONAN_OPENBLAS_ROOT}"
+        )
+
+# vim: ts=4 sw=4 expandtab ffs=unix ft=python foldmethod=marker :
