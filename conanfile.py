@@ -51,7 +51,7 @@ class openblasConan(ConanFile):
                 self.get_make_arch(),
             )
             if not self.options.shared:      make_options += ' NO_SHARED=1'
-            if not self.options.NO_LAPACKE:  make_options += ' NO_LAPACKE=1'
+            if     self.options.NO_LAPACKE:  make_options += ' NO_LAPACKE=1'
             if not self.options.USE_MASS:    make_options += ' USE_MASS=1'
             if not self.options.USE_OPENMP:  make_options += ' USE_OPENMP=1'
 
@@ -64,7 +64,7 @@ class openblasConan(ConanFile):
         else:
             self.output.warn("Building with CMake: Some options won't make any effect")
             cmake = CMake(self)
-            cmake.definitions["USE_MASS"] = self.options.USE_MASS
+            cmake.definitions["USE_MASS"]   = self.options.USE_MASS
             cmake.definitions["USE_OPENMP"] = self.options.USE_OPENMP
             cmake.definitions["NO_LAPACKE"] = self.options.NO_LAPACKE
             cmake.configure(source_dir="sources")
