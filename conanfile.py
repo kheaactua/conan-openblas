@@ -46,15 +46,15 @@ class openblasConan(ConanFile):
 
     def build(self):
         if self.settings.compiler != "Visual Studio":
-            make_options = "DEBUG={debug} BINARY={binary} USE_MASS={mass} USE_OPENMP={openmp}".format(
+            make_options = "DEBUG={debug} BINARY={binary} USE_MASS={mass}".format(
                 debug  = self.get_make_build_type_debug(),
                 binary = self.get_make_arch(),
                 mass   = self.get_make_option_value(self.options.USE_MASS),
-                openmp = self.get_make_option_value(self.options.USE_OPENMP),
             )
 
             if not self.options.shared:      make_options += ' NO_SHARED=1'
             if     self.options.NO_LAPACKE:  make_options += ' NO_LAPACKE=1'
+            if     self.options.USE_OPENMP:  make_options += ' USE_OPENMP=1'
 
             self.output.info('Running make with: %s'%make_options)
             self.run("cd sources && make %s" % make_options, cwd=self.source_folder)
